@@ -1,0 +1,36 @@
+CREATE DATABASE ORG_DEMO_DB;
+
+CREATE TABLE persons (
+    person_id int AUTO_INCREMENT PRIMARY KEY,
+    first_name varchar(255) NOT NULL,
+    last_name varchar(255) NOT NULL,
+    date_of_birth DATE NOT NULL,
+    gender ENUM('M', 'F') NOT NULL,
+	title  varchar(50)  NOT NULL,
+    UNIQUE (first_name,last_name,date_of_birth)
+);
+
+CREATE TABLE org_demo_db.addresses (
+	person_id int NOT NULL,
+	address_id int AUTO_INCREMENT PRIMARY KEY,
+    addr_type ENUM('home','work') NOT NULL,
+    addr_number int NOT NULL,
+    street varchar(255) NOT NULL,
+    unit varchar(50),
+	city  varchar(100) NOT NULL,
+	addr_state  varchar(2) NOT NULL,
+	zipcode  varchar(8) NOT NULL,
+	FOREIGN KEY (person_id) REFERENCES Persons (person_id)
+	
+	
+);
+
+CREATE TABLE org_demo_db.contacts (
+	person_id int NOT NULL,
+    contact_id int AUTO_INCREMENT PRIMARY KEY,
+    contact_type ENUM('Email', 'Cell') NOT NULL,
+    contact_value  varchar(50) NOT NULL,
+    preferred ENUM('true', 'false'),
+    FOREIGN KEY (person_id) REFERENCES Persons (person_id)
+	
+);
