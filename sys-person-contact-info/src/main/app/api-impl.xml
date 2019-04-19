@@ -79,23 +79,39 @@ persons map {
 payload]]></dw:set-payload>
         </dw:transform-message>
         <foreach doc:name="For Each">
-            <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
-                <db:bulk-execute config-ref="MySQL_Configuration" doc:name="DELETE from persons,addresses,contacts DB"><![CDATA[delete from addresses where person_id=#[payload.personId];
-delete from contacts where person_id=#[payload.personId];
-delete from persons where person_id=#[payload.personId];
+            <set-variable variableName="personId" value="#[payload.personId]" doc:name="save personId"/>
+            <db:select config-ref="MySQL_Configuration" doc:name="Database">
+                <db:parameterized-query><![CDATA[select person_id from persons where person_id=#[flowVars.personId]]]></db:parameterized-query>
+            </db:select>
+            <choice doc:name="Choice">
+                <when expression="payload.size() &gt; 0">
+                    <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+                        <db:bulk-execute config-ref="MySQL_Configuration" doc:name="DELETE from persons,addresses,contacts DB"><![CDATA[delete from addresses where person_id=#[flowVars.personId];
+delete from contacts where person_id=#[flowVars.personId];
+delete from persons where person_id=#[flowVars.personId];
 ]]></db:bulk-execute>
-                <catch-exception-strategy doc:name="Catch Exception Strategy">
-                    <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+                        <catch-exception-strategy doc:name="Catch Exception Strategy">
+                            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
 
-flowVars.failed_data.add(payload.personId);
+flowVars.failed_data.add(flowVars.personId);
 
 ]]></expression-component>
-                </catch-exception-strategy>
-            </transactional>
+                        </catch-exception-strategy>
+                    </transactional>
+                </when>
+                <otherwise>
+                    <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+
+flowVars.failed_data.add(flowVars.personId);
+
+]]></expression-component>
+                </otherwise>
+            </choice>
         </foreach>
     </sub-flow>
  
     <flow name="sf-post-persons">
+        <set-variable variableName="success_data" value="#[ new java.util.HashMap()]" doc:name="FV Initiate success_data Map"/>
     <set-variable variableName="failed_data" value="#[ new java.util.HashMap()]"
 			doc:name="FV Initiate failed_data Map"  />
         <dw:transform-message doc:name="Transform Message">
@@ -105,6 +121,7 @@ flowVars.failed_data.add(payload.personId);
 payload]]></dw:set-payload>
         </dw:transform-message>
         <foreach doc:name="For Each">
+            <set-variable variableName="isFailedInsert" value="false" doc:name="FV initialize isFailedInsert false"/>
             <flow-ref name="pf-insert-into-person-table" doc:name="pf-insert-into-person-table"/>
             <choice doc:name="Choice">
                 <when expression="flowVars.personId != null">
@@ -122,7 +139,7 @@ payload]]></dw:set-payload>
                             </db:insert>
                         </foreach>
                         <catch-exception-strategy doc:name="Catch Exception Strategy">
-                            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+                            <expression-component doc:name="XH FILTER save failed data"><![CDATA[flowVars.isFailedInsert ="true";
 if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
 flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
 }else{
@@ -139,16 +156,37 @@ flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
                     <logger level="INFO" doc:name="Logger"/>
                 </otherwise>
             </choice>
+            <choice doc:name="Choice">
+                <when expression="flowVars.isFailedInsert ==&quot;true&quot;">
+                    <logger level="INFO" doc:name="Logger"/>
+                </when>
+                <otherwise>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-variable variableName="personDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+
+	personId:flowVars.personId,
+	first_name:flowVars.personDetails.first_name,
+	last_name:flowVars.personDetails.last_name
+}
+	]]></dw:set-variable>
+
+                    </dw:transform-message>
+                    <expression-component doc:name="Expression"><![CDATA[flowVars.success_data.put(flowVars.personId,flowVars.personDetails);]]></expression-component>
+                </otherwise>
+            </choice>
         </foreach>
 
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
-if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+            <expression-component doc:name="XH FILTER save failed data"><![CDATA[if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
 flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
 }else{
 flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
 }
 ]]></expression-component>
+
 
         </catch-exception-strategy>
     </flow>
@@ -172,7 +210,7 @@ flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
         </db:insert>
         <set-variable variableName="personId" value="#[payload[0].generated_key]" doc:name="save primary Key"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+            <expression-component doc:name="XH FILTER save failed data"><![CDATA[flowVars.isFailedInsert = "true";
 if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
 flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
 }else{
@@ -192,7 +230,7 @@ payload]]></dw:set-payload>
         <foreach doc:name="For Each Persons">
             <flow-ref name="pf-update-person-table" doc:name="update person table"/>
             <choice doc:name="CHECK if the personIs is NOT NULL">
-                <when expression="flowVars.personId != null">
+                <when expression="flowVars.personId != null &amp;&amp; payload == 1">
                     <ee:multi-transactional action="ALWAYS_BEGIN" doc:name="TRANSACTION">
                         <db:delete config-ref="MySQL_Configuration" doc:name="DELETE from address DB">
                             <db:parameterized-query><![CDATA[delete from addresses where person_id = #[flowVars.personId]]]></db:parameterized-query>
@@ -223,7 +261,14 @@ flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
                     </ee:multi-transactional>
                 </when>
                 <otherwise>
-                    <logger level="INFO" doc:name="Logger"/>
+                    <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
+}else{
+flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
+}
+]]></expression-component>
+
                 </otherwise>
             </choice>
         </foreach>
@@ -256,12 +301,11 @@ flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
             <db:parameterized-query><![CDATA[UPDATE persons  
 SET first_name=#[payload.Identification.FirstName] ,
 last_name=#[payload.Identification.LastName],
-date_of_birth=STR_TO_DATE(#[payload.Identification.DOB], '%Y-%c-%d'),
+date_of_birth=STR_TO_DATE(#[payload.Identification.DOB], '%c/%d/%Y'),
 gender=#[payload.Identification.Gender],
 title=#[payload.Identification.Title]
 where person_id = #[payload.personId];]]></db:parameterized-query>
         </db:update>
-
         <catch-exception-strategy doc:name="Copy_of_Catch Exception Strategy">
             <expression-component doc:name="XH FILTER save failed data"><![CDATA[
 if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
@@ -272,5 +316,6 @@ flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
 ]]></expression-component>
         </catch-exception-strategy>
     </flow>
+
 
 </mule>
