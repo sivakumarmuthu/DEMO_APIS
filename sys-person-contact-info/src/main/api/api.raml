@@ -1,0 +1,23 @@
+#%RAML 0.8
+title: sys-contact-info-api
+version: v1
+protocols: [HTTPS]
+baseUri: http://localhost:8081/api/system/{version}/
+mediaType: application/json
+
+documentation:
+  - title: Person Contact system layer API
+    content: !include docs/getting-started.md
+resourceTypes:
+   - collection-item: !include resourceTypes/CollectionItem.raml 
+traits:
+   - headers: !include traits/header.raml
+schemas:
+   - personsPostReqSchema: !include schemas/persons-post-req-schema.json
+   - personsPosRespSchema: !include schemas/persons-post-resp-schema.json
+   - personsPutReqSchema: !include schemas/persons-put-req-schema.json
+   - personsPutRespSchema: !include schemas/persons-put-req-schema.json
+   - personsDeleteReqSchema: !include schemas/persons-delete-req-schema.json
+   - personsGetRespSchema: !include schemas/persons-schema.json
+   - errorResponse: !include schemas/ErrorResponseSchema.json
+/persons: !include api/persons.raml

@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <db:mysql-config name="MySQL_Configuration" host="localhost" port="3306" user="root" password="password" database="org_demo_db" doc:name="MySQL Configuration"/>
+    <sub-flow name="sf-get-persons">
+        <db:select config-ref="MySQL_Configuration" doc:name="SELECT from adress,contacts and persons DB">
+            <db:parameterized-query><![CDATA[select a.person_id,a.first_name, a.last_name,a.date_of_birth,a.gender,a.title,
+       b.address_id,b.addr_type,b.addr_number,b.street,b.unit,b.city,b.addr_state,b.zipcode,
+       c.contact_id,c.contact_type,c.contact_value,c.preferred from
+    persons a
+        inner join
+    addresses b
+        on a.person_id = b.person_id
+        inner join 
+    contacts c
+        on b.person_id = c.person_id]]></db:parameterized-query>
+        </db:select>
+        <choice doc:name="CHECK if the result size is &gt; 0">
+            <when expression="payload.size() &gt; 0">
+                <dw:transform-message doc:name="DW contstuct JSON response">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+%var persongroup= payload groupBy $.person_id
+%var addressgroup= payload groupBy $.address_id 
+%var contactgroup= payload groupBy $.contact_id
+%var persons=persongroup..person_id distinctBy $
+---
+   
+persons map {
+		personId: persongroup.'$'.person_id reduce  $ as :string,
+		Identification:{
+			FirstName: persongroup.'$'.first_name reduce  $,
+			LastName: persongroup.'$'.last_name reduce  $,
+			DOB: ((persongroup.'$'.date_of_birth reduce  $) [0 to 9]) as :string {format: "MM/dd/yyyy"},
+			Gender: persongroup.'$'.gender  reduce  $,
+			Title: persongroup.'$'.title  reduce  $
+		},
+		Address: persongroup.'$'.address_id distinctBy $ map {
+			AddressType:addressgroup.'$'.addr_type reduce  $,
+			AddressNumber:addressgroup.'$'.addr_number reduce  $,
+			street:addressgroup.'$'.street reduce  $,
+			Unit:addressgroup.'$'.unit reduce  $,
+			AddressState:addressgroup.'$'.addr_state reduce  $,
+			City:addressgroup.'$'.city reduce  $,
+			State:addressgroup.'$'.addr_state reduce  $,
+			zipcode:addressgroup.'$'.zipcode reduce  $
+		},
+		Communication:persongroup.'$'.contact_id distinctBy $ map using(pref=(preferred:contactgroup.'$'.preferred) reduce  $) {
+			ContactType:contactgroup.'$'.contact_type reduce  $,
+			ContactValue:contactgroup.'$'.contact_value reduce  $,
+			(preferred:pref reduce  $) when pref != null
+		}
+		
+}
+]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <set-payload value="[]" mimeType="application/json" doc:name="Set default Payload"/>
+            </otherwise>
+        </choice>
+
+    </sub-flow>
+    <sub-flow name="sf-delete-persons">
+        <set-variable variableName="failed_data" value="#[ new java.util.ArrayList()]" doc:name="FV Initiate failed_data Map"/>
+        <dw:transform-message doc:name="DW convert payload to java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <foreach doc:name="For Each">
+            <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+                <db:bulk-execute config-ref="MySQL_Configuration" doc:name="DELETE from persons,addresses,contacts DB"><![CDATA[delete from addresses where person_id=#[payload.personId];
+delete from contacts where person_id=#[payload.personId];
+delete from persons where person_id=#[payload.personId];
+]]></db:bulk-execute>
+                <catch-exception-strategy doc:name="Catch Exception Strategy">
+                    <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+
+flowVars.failed_data.add(payload.personId);
+
+]]></expression-component>
+                </catch-exception-strategy>
+            </transactional>
+        </foreach>
+    </sub-flow>
+ 
+    <flow name="sf-post-persons">
+    <set-variable variableName="failed_data" value="#[ new java.util.HashMap()]"
+			doc:name="FV Initiate failed_data Map"  />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <foreach doc:name="For Each">
+            <flow-ref name="pf-insert-into-person-table" doc:name="pf-insert-into-person-table"/>
+            <choice doc:name="Choice">
+                <when expression="flowVars.personId != null">
+                    <ee:multi-transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+                        <foreach collection="#[flowVars.personDetails.address]" doc:name="Copy_of_For Each">
+                            <db:insert config-ref="MySQL_Configuration" doc:name="Copy_of_Database">
+                                <db:parameterized-query><![CDATA[INSERT INTO addresses (person_id,addr_type,addr_number,street,unit,city,addr_state,zipcode) values
+       (#[flowVars.personId],#[payload.AddressType],#[payload.AddressNumber],#[payload.street],#[payload.Unit],#[payload.City],#[payload.AddressState],#[payload.zipcode]);]]></db:parameterized-query>
+                            </db:insert>
+                        </foreach>
+                        <foreach collection="#[flowVars.personDetails.communication]" doc:name="Copy_of_For Each">
+                            <db:insert config-ref="MySQL_Configuration" doc:name="Copy_of_Database">
+                                <db:parameterized-query><![CDATA[INSERT INTO contacts (person_id,contact_type,contact_value,preferred) values
+       (#[flowVars.personId],#[payload.ContactType],#[payload.ContactValue],#[payload.preferred]);]]></db:parameterized-query>
+                            </db:insert>
+                        </foreach>
+                        <catch-exception-strategy doc:name="Catch Exception Strategy">
+                            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
+}else{
+flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
+}
+]]></expression-component>
+                            <db:delete config-ref="MySQL_Configuration" doc:name="Database">
+                                <db:parameterized-query><![CDATA[delete from persons where person_id = #[flowVars.person_id]]]></db:parameterized-query>
+                            </db:delete>
+                        </catch-exception-strategy>
+                    </ee:multi-transactional>
+                </when>
+                <otherwise>
+                    <logger level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+        </foreach>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
+}else{
+flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
+}
+]]></expression-component>
+
+        </catch-exception-strategy>
+    </flow>
+    <flow name="pf-insert-into-person-table">
+        <dw:transform-message doc:name="DW save person Details in FV">
+            <dw:set-variable variableName="personDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	communication:payload.Communication,
+	address:payload.Address,
+	personId:payload.personId,
+	first_name:payload.Identification.FirstName,
+	last_name:payload.Identification.LastName
+}
+]]></dw:set-variable>
+        </dw:transform-message>
+        <db:insert config-ref="MySQL_Configuration" autoGeneratedKeys="true" autoGeneratedKeysColumnNames="person_id" doc:name="INSERT into persons DB">
+            <db:parameterized-query><![CDATA[INSERT INTO persons (first_name,last_name,date_of_birth,gender,title) values
+       (#[payload.Identification.FirstName],#[payload.Identification.LastName],STR_TO_DATE(#[payload.Identification.DOB], '%c/%d/%Y'),#[payload.Identification.Gender],#[payload.Identification.Title]);]]></db:parameterized-query>
+        </db:insert>
+        <set-variable variableName="personId" value="#[payload[0].generated_key]" doc:name="save primary Key"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
+}else{
+flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
+}
+]]></expression-component>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="sf-put-persons">
+        <set-variable variableName="failed_data" value="#[ new java.util.HashMap()]" doc:name="FV Initiate failed_data Map"/>
+        <dw:transform-message doc:name="DW convert payload to Java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <foreach doc:name="For Each Persons">
+            <flow-ref name="pf-update-person-table" doc:name="update person table"/>
+            <choice doc:name="CHECK if the personIs is NOT NULL">
+                <when expression="flowVars.personId != null">
+                    <ee:multi-transactional action="ALWAYS_BEGIN" doc:name="TRANSACTION">
+                        <db:delete config-ref="MySQL_Configuration" doc:name="DELETE from address DB">
+                            <db:parameterized-query><![CDATA[delete from addresses where person_id = #[flowVars.personId]]]></db:parameterized-query>
+                        </db:delete>
+                        <foreach collection="#[flowVars.personDetails.address]" doc:name="For Each Addresses">
+                            <db:insert config-ref="MySQL_Configuration" doc:name="INSERT into address DB">
+                                <db:parameterized-query><![CDATA[INSERT INTO addresses (person_id,addr_type,addr_number,street,unit,city,addr_state,zipcode) values
+       (#[flowVars.personId],#[payload.AddressType],#[payload.AddressNumber],#[payload.street],#[payload.Unit],#[payload.City],#[payload.AddressState],#[payload.zipcode])]]></db:parameterized-query></db:insert>
+                        </foreach>
+                        <db:delete config-ref="MySQL_Configuration" doc:name="DELETE from contacts DB">
+                            <db:parameterized-query><![CDATA[delete from contacts where person_id =  #[flowVars.personId]]]></db:parameterized-query>
+
+                        </db:delete>
+                        <foreach collection="#[flowVars.personDetails.communication]" doc:name="For Each Contacts">
+                            <db:insert config-ref="MySQL_Configuration" doc:name="INSERT into contacts DB">
+                                <db:parameterized-query><![CDATA[INSERT INTO contacts (person_id,contact_type,contact_value,preferred) values
+       (#[flowVars.personId],#[payload.ContactType],#[payload.ContactValue],#[payload.preferred]);]]></db:parameterized-query></db:insert>
+                        </foreach>
+                        <catch-exception-strategy doc:name="Catch Exception Strategy">
+                            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
+}else{
+flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
+}
+]]></expression-component>
+                        </catch-exception-strategy>
+                    </ee:multi-transactional>
+                </when>
+                <otherwise>
+                    <logger level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+        </foreach>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
+}else{
+flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
+}
+]]></expression-component>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="pf-update-person-table">
+        <dw:transform-message doc:name="DW save person Details in FV">
+            <dw:set-variable variableName="personDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	communication:payload.Communication,
+	address:payload.Address,
+	personId:payload.personId,
+	first_name:payload.Identification.FirstName,
+	last_name:payload.Identification.LastName
+}
+]]></dw:set-variable>
+        </dw:transform-message>
+        <set-variable variableName="personId" value="#[payload.personId]" doc:name="save primary Key"/>
+        <db:update config-ref="MySQL_Configuration" doc:name="UPDATE persons DB">
+            <db:parameterized-query><![CDATA[UPDATE persons  
+SET first_name=#[payload.Identification.FirstName] ,
+last_name=#[payload.Identification.LastName],
+date_of_birth=STR_TO_DATE(#[payload.Identification.DOB], '%Y-%c-%d'),
+gender=#[payload.Identification.Gender],
+title=#[payload.Identification.Title]
+where person_id = #[payload.personId];]]></db:parameterized-query>
+        </db:update>
+
+        <catch-exception-strategy doc:name="Copy_of_Catch Exception Strategy">
+            <expression-component doc:name="XH FILTER save failed data"><![CDATA[
+if(flowVars.personDetails !=null && flowVars.personDetails.personId !=null){
+flowVars.failed_data.put(flowVars.personDetails.personId,flowVars.personDetails);
+}else{
+flowVars.failed_data.put(java.util.UUID.randomUUID(),flowVars.personDetails);
+}
+]]></expression-component>
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

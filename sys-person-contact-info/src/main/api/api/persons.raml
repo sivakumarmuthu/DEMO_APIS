@@ -1,0 +1,14 @@
+description: System API is used to create,update,delete,read from person database
+type: {
+  collection-item: {
+   errors-schema: errorResponse,
+   collectionItem-getResp-schema: personsGetRespSchema,
+   collectionItem-getResp-example: !include example/persons-example.json,
+   collectionItem-postReq-schema: personsPostReqSchema,
+   collectionItem-postReq-example: !include example/persons-post-req-example.json,
+   collectionItem-putReq-schema: personsPutReqSchema,
+   collectionItem-putReq-example: !include example/persons-put-req-example.json,
+   collectionItem-deleteReq-schema: personsDeleteReqSchema,
+   collectionItem-deleteReq-example: !include example/persons-delete-req-example.json
+   }
+   }

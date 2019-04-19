@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "personId": {
+          "type": "string"
+        },
+        "Identification": {
+          "type": "object",
+          "properties": {
+            "FirstName": {
+              "type": "string"
+            },
+            "LastName": {
+              "type": "string"
+            },
+            "DOB": {
+              "type": "string"
+            },
+            "Gender": {
+              "type": "string"
+            },
+            "Title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "FirstName",
+            "LastName",
+            "DOB",
+            "Gender",
+            "Title"
+          ]
+        },
+        "Address": {
+          "type": "array",
+          "items": [
+            {
+              "type": "object",
+              "properties": {
+                "AddressType": {
+                  "type": "string"
+                },
+                "AddressNumber": {
+                  "type": "integer"
+                },
+                "street": {
+                  "type": "string"
+                },
+                "Unit": {
+                  "type": "string"
+                },
+                "City": {
+                  "type": "string"
+                },
+                "AddressState": {
+                  "type": "string"
+                },
+                "zipcode": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "AddressType",
+                "AddressNumber",
+                "street",
+                "Unit",
+                "City",
+                "AddressState",
+                "zipcode"
+              ]
+            }
+          ]
+        },
+        "Communication": {
+          "type": "array",
+          "items": [
+            {
+              "type": "object",
+              "properties": {
+                "ContactType": {
+                  "type": "string"
+                },
+                "ContactValue": {
+                  "type": "string"
+                },
+                "preferred": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ContactType",
+                "ContactValue"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+         "personId",
+        "Identification",
+        "Address",
+        "Communication"
+      ]
+    }
+  ]
+}

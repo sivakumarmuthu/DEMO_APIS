@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "errorCode": "504",
+      "errorMessage": "Gateway Timeout"
+    }
+  ]
+}

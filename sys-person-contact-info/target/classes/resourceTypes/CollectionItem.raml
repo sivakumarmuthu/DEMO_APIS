@@ -1,0 +1,171 @@
+get:
+  is: [headers]
+  description: api is used to retrieve the  entry stored in DB.    
+  responses:
+    200:
+      description:  SUCCESS
+      body:
+        application/json:
+          schema: <<collectionItem-getResp-schema>>
+          example: <<collectionItem-getResp-example>>          
+    400:
+      description:  BAD REQUEST
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode400ResponseExample.json      
+    401:
+      description:  UNAUTHORIZED
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode401ResponseExample.json          
+    404:
+      description: RESOURCE NOT FOUND
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode404ResponseExample.json
+    500:
+      description:  INTERNAL SERVER ERROR
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode500ResponseExample.json
+    504:
+      description:  GATEWAY TIMEOUT
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode504ResponseExample.json
+post:
+  is: [headers]
+  description: api is used create a data to store in DB.
+  body:
+    application/json:
+      schema: <<collectionItem-postReq-schema>>
+      example: <<collectionItem-postReq-example>>
+  responses:
+    201:
+      description: SUCCESS
+      body:
+    207:
+      description: MultiStatus
+      body:
+
+    400:
+      description:  BAD REQUEST
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode400ResponseExample.json
+    401:
+      description:  UNAUTHORIZED
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode401ResponseExample.json             
+    404:
+      description:  RESOURCE NOT FOUND
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode404ResponseExample.json   
+    500:
+      description:  INTERNAL SERVER ERROR
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode500ResponseExample.json
+    504:
+      description:  GATEWAY TIMEOUT
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode504ResponseExample.json
+put:
+  is: [headers]
+  description: api is used create a data to store in DB.
+  body:
+    application/json:
+      schema: <<collectionItem-putReq-schema>>
+      example: <<collectionItem-putReq-example>>
+  responses:
+    204:
+      description: UPDATED SUCCESSFULLY
+      body:
+    207:
+      description: MultiStatus
+      body:
+      
+    400:
+      description:  BAD REQUEST
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode400ResponseExample.json
+    401:
+      description:  UNAUTHORIZED
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode401ResponseExample.json          
+    404:
+      description:  RESOURCE NOT FOUND
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode404ResponseExample.json    
+    500:
+      description:  INTERNAL SERVER ERROR
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode500ResponseExample.json
+    504:
+      description:  GATEWAY TIMEOUT
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode504ResponseExample.json
+delete:
+  is: [headers]
+  description: api is used to delete the data stored in DB.
+  body:
+    application/json:
+      schema: <<collectionItem-deleteReq-schema>>
+      example: <<collectionItem-deleteReq-example>>
+  responses:
+    204:
+      description: DELETED SUCCESSFULLY
+    400:
+      description:  BAD REQUEST
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode400ResponseExample.json
+    401:
+      description:  UNAUTHORIZED
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode401ResponseExample.json          
+             
+    404:
+      description:  RESOURCE NOT FOUND
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode404ResponseExample.json   
+    500:
+      description:  INTERNAL SERVER ERROR
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode500ResponseExample.json
+    504:
+      description:  GATEWAY TIMEOUT
+      body:
+        application/json:
+          schema: <<errors-schema>>
+          example: !include ../api/example/error/errorCode504ResponseExample.json

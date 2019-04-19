@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "errorCode": {
+            "description":"It indicates the error code of the exception that has been occured.",
+            "type": "string"
+          },
+          "errorMessage": {
+            "description":"It indicates the error message of the exception that has been occured.",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
